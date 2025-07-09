@@ -4,8 +4,10 @@ import http from "http";
 import path from "path";
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
 
-import { retriever } from "./retriever.js";
+// import { retriever } from "./retriever.js";
+import { getRetriever } from "./retriever.js";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -18,6 +20,10 @@ const server = http.createServer(app);
 
 // Instantiate Socket.io on HTTP server
 const io = new socket(server);
+
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Set public directory for static files
 app.use(express.static(path.join(__dirname, "public")));
@@ -45,12 +51,14 @@ io.on("connection", (socket) => {
   socket.on("message", async (data) => {
     console.log("Message received:", data);
 
+    // Get the retriever instance
+    const retriever = await getRetriever();
+
     // Get the context from the retriever
     const context = await retriever.getRelevantDocuments(data);
-    console.log("Context retrieved:", context.map((doc) => doc.pageContent).join("\n\n"));
 
     // const hello = `Bot: You said "${data}""`;
-    const prompt = `You are a helpful assistant. Use the following context to answer the user's question. If the context does not provide enough information, say u dont know the answer. Dont make up answers. Dont share the context with the user. Don't say anything about the context. Just answer the question.
+    const prompt = `You are a helpful assistant. Use the following context to answer the user's question. If the context does not provide enough information, say u dont know the answer. Dont make up answers. Dont share the context with the user. Don't say anything about the context. Just answer the question. answer the question based on the context provided in detail and in a friendly manner.
     Context: ${context.map((doc) => doc.pageContent).join("\n\n")}
     User's Question : ${data}`;
 

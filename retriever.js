@@ -1,54 +1,85 @@
+import fs from "fs";
+import path from "path";
+import "dotenv/config";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { Document } from "@langchain/core/documents";
-import "dotenv/config";
-import fs from "fs";
+import { fileURLToPath } from "url";
 
-// Load existing blogs
-const raw = fs.readFileSync("data.json", "utf-8");
-const data = JSON.parse(raw);
+import { fetchAllPages } from "./data.js";
 
-// If no data found, exit
-if (!data || data.length === 0) {
-  console.error("No data found in data.json");
-  process.exit(1);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function loadBlogs() {
+  // Load existing blogs from data.json
+  const raw = fs.readFileSync(path.join(__dirname, "data.json"), "utf-8");
+  const data = JSON.parse(raw);
+
+  // Convert data to Document format
+  return data.map((item) => {
+    return new Document({
+      pageContent: item.content.text,
+      metadata: {
+        title: item.title,
+        links: item.links,
+        images: item.images,
+        id: item.id,
+      },
+    });
+  });
 }
 
-// Convert data to Document format
-const docsList = data.map((item) => {
-  return new Document({
-    pageContent: item.content.text,
-    metadata: {
-      title: item.title,
-      links: item.links,
-      images: item.images,
-      id: item.id,
-    },
+async function buildRetriever() {
+  const docsList = loadBlogs();
+
+  // Create a text splitter to chunk the documents
+  const textSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 500,
+    chunkOverlap: 50,
   });
-});
 
-// Create a text splitter to chunk the documents
-const textSplitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 500,
-  chunkOverlap: 50,
-});
+  // Split the documents into smaller chunks
+  const docSplits = await textSplitter.splitDocuments(docsList);
 
-// Split the documents into smaller chunks
-const docSplits = await textSplitter.splitDocuments(docsList);
+  // Create a vector store from the document splits using OpenAI embeddings
+  const vectorStore = await MemoryVectorStore.fromDocuments(
+    docSplits,
+    new OpenAIEmbeddings()
+  );
 
-// Add to vectorDB
-const vectorStore = await MemoryVectorStore.fromDocuments(
-  docSplits,
-  new OpenAIEmbeddings(),
-);
+  // Create a retriever from the vector store
+  const retriever = vectorStore.asRetriever();
+  retriever.k = 6; // Set the number of relevant documents to retrieve
 
-// Create a retriever to query the vector store
-const retriever = vectorStore.asRetriever();
-retriever.k = 6; // Set the number of results to return
+  return retriever;
+}
 
-// Export the retriever for use in other parts of the application
-export { retriever };
+// Singleton retriever with auto-refresh
+let cachedRetriever = null;
+
+async function initRetriever() {
+  console.log("⏳ Fetching new blog data...");
+  await fetchAllPages();
+
+  console.log("⏳ Building retriever...");
+  cachedRetriever = await buildRetriever();
+  console.log("✅ Retriever initialized.");
+
+  // Set auto-refresh every 1 hour (3600000 ms)
+  setTimeout(initRetriever, 1000 * 60 * 60);
+}
+
+// Public getter for cached retriever
+export async function getRetriever() {
+  if (!cachedRetriever) {
+    await initRetriever();
+  }
+  return cachedRetriever;
+}
+
+initRetriever();
 
 // Example query to test the retriever
 // const userQuery = "Tell me how gold price is determined?";

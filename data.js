@@ -1,5 +1,5 @@
 import fs from "fs";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 
 function loadExistingBlogs() {  
   if (fs.existsSync("data.json")) {
