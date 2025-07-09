@@ -6,9 +6,6 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 
-// import { retriever } from "./retriever.js";
-import { getRetriever } from "./retriever.js";
-
 // Load environment variables from .env file
 dotenv.config();
 
@@ -43,6 +40,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Get the retriever instance
+import { getRetriever } from "./retriever.js";
+const retriever = await getRetriever();
+
 // Socket Code
 io.on("connection", (socket) => {
   console.log("A user connected");
@@ -50,9 +51,6 @@ io.on("connection", (socket) => {
   // Handle incoming messages
   socket.on("message", async (data) => {
     console.log("Message received:", data);
-
-    // Get the retriever instance
-    const retriever = await getRetriever();
 
     // Get the context from the retriever
     const context = await retriever.getRelevantDocuments(data);
