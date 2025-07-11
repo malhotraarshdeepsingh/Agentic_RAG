@@ -23,8 +23,7 @@ function loadBlogs() {
       pageContent: item.content.text,
       metadata: {
         title: item.title,
-        links: item.links,
-        images: item.images,
+        link: item.link,
         id: item.id,
       },
     });

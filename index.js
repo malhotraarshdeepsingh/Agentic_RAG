@@ -56,11 +56,14 @@ io.on("connection", (socket) => {
 
     // Get the context from the retriever
     const context = await retriever.getRelevantDocuments(data);
+    console.log("Context retrieved:", context);
 
     // const hello = `Bot: You said "${data}""`;
     const prompt = `You are a helpful assistant. Use the following context to answer the user's question. If the context does not provide enough information, say u dont know the answer. Dont make up answers. Dont share the context with the user. Don't say anything about the context. Just answer the question. answer the question based on the context provided in detail and in a friendly manner.
     Context: ${context.map((doc) => doc.pageContent).join("\n\n")}
-    User's Question : ${data}`;
+    Context metadata: ${context.map((doc) => JSON.stringify(doc.metadata)).join("\n\n")}
+    User's Question : ${data}
+    Also include the source of the answer in the response. Just refer the source for more information. Just share the blog link. For example: "For more information, visit: [blog link]".`;
 
     const response = await openai.completions.create({
       model: "gpt-3.5-turbo-instruct",
